@@ -1,0 +1,6 @@
+/dorocap
+/dist/
+/build/
+.claude/
+.DS_Store
+*.local.md

@@ -1,0 +1,17 @@
+# File: CODEOWNERS
+# Everything defaults to the maintainer.
+*                           @0xF3tt
+
+# High-risk / evidence-integrity paths — never auto-approved, always
+# explicit human review, out of scope for the maintenance agent.
+/capture.go                 @0xF3tt
+/export.go                  @0xF3tt
+/finding.go                 @0xF3tt
+/engagement.go              @0xF3tt
+/config.go                  @0xF3tt
+/.github/workflows/         @0xF3tt
+/.github/agents/            @0xF3tt
+/.github/dependabot.yml     @0xF3tt
+/.pre-commit-config.yaml    @0xF3tt
+/Makefile                   @0xF3tt
+/SECURITY.md                @0xF3tt
