@@ -435,7 +435,7 @@ make test    # unit tests
 make lint    # vet + staticcheck + golangci-lint
 make audit   # gosec + govulncheck
 make tools   # install pinned lint, audit, release, and SBOM tools
-make release # macOS/Linux/Windows binaries, checksums, and CycloneDX SBOM
+make release # macOS/Linux binaries, checksums, and CycloneDX SBOM
 ```
 
 See `make help` for the full target list. Before opening a PR, make sure

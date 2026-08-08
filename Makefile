@@ -3,7 +3,7 @@ VERSION  := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev
 LDFLAGS  := -s -w -X main.version=$(VERSION)
 DIST     := dist
 
-PLATFORMS := darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 windows/arm64
+PLATFORMS := darwin/amd64 darwin/arm64 linux/amd64 linux/arm64
 
 # Pin build tools so a release can be reproduced after upstream tools change.
 GARBLE_VERSION       := v0.13.0

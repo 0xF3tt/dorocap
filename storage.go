@@ -183,6 +183,13 @@ func withFileLock(target string, fn func() error) error {
 			defer func() { _ = root.Remove(lock) }()
 			return fn()
 		}
+		if os.IsPermission(err) {
+			_, statErr := root.Stat(lock)
+			if statErr == nil || os.IsNotExist(statErr) {
+				time.Sleep(25 * time.Millisecond)
+				continue
+			}
+		}
 		if !os.IsExist(err) {
 			return err
 		}
