@@ -11,6 +11,11 @@ timeout-minutes: 30
 max-ai-credits: 500
 max-daily-ai-credits: 1000
 
+models:
+  default-ai-credits-pricing:
+    input: 3.0
+    output: 15.0
+
 features:
   group-concurrency-queue: false
 
@@ -23,7 +28,7 @@ imports:
 
 permissions:
   contents: read
-
+  copilot-requests: write
 network:
   allowed: [defaults, go]
 
