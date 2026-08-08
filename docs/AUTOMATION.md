@@ -10,7 +10,7 @@ changes, but a human controls merges and releases.
 flowchart TD
     A[Developer, Dependabot, or docs agent] --> B[Pull request]
     B --> C[CI: build and test on 3 operating systems]
-    B --> D[CI: minimum Go 1.22 compatibility]
+    B --> D[CI: minimum Go 1.25 compatibility]
     B --> E[CI: formatting, vet, lint, and security audit]
     B --> F[CodeQL: Go and Actions analysis]
     C --> G{All required checks pass?}
@@ -56,7 +56,7 @@ still the authoritative gate.
 1. `build & test (ubuntu-latest)`
 2. `build & test (macos-latest)`
 3. `build & test (windows-latest)`
-4. `minimum Go compatibility (1.22.x)`
+4. `minimum Go compatibility (1.25.x)`
 5. `lint & security audit`
 
 The three operating-system jobs use the pinned current Go toolchain and run a
