@@ -142,7 +142,7 @@ only `contents: write` permission in the conventional workflows.
 
 The release contains:
 
-- Obfuscated binaries for supported macOS, Linux, and Windows architectures
+- Obfuscated binaries for supported macOS and Linux architectures
 - A CycloneDX SBOM
 - SHA-256 checksums
 - GitHub-generated release notes
