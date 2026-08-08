@@ -67,7 +67,9 @@ on:
         required: false
         type: string
 
-permissions: {}
+permissions:
+  contents: read
+  copilot-requests: write
 
 concurrency:
   cancel-in-progress: false
