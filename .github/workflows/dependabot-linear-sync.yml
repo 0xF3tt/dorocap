@@ -1,0 +1,153 @@
+name: Sync Dependabot PRs to Linear
+
+on:
+  schedule:
+    - cron: "35 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: dependabot-linear-sync
+  cancel-in-progress: false
+
+env:
+  LINEAR_API_URL: https://api.linear.app/graphql
+  LINEAR_TEAM_ID: ea88f975-bded-493d-ad56-f8a497dbcdf2
+  LINEAR_PROJECT_ID: 4e75fe99-f0e5-4f17-9a6e-29c9fb8dd0a8
+  LINEAR_STATE_ID: 9d99ef2c-2ce6-4256-b74f-3706b72c49f9
+  LINEAR_LABEL_DEPENDENCIES_ID: 91973750-2eef-4204-b265-b20c203d549f
+  LINEAR_LABEL_MAINTENANCE_ID: c70dad45-2e19-46c9-82aa-3506df2f3589
+  LINEAR_LABEL_SECURITY_ID: ae943188-9c8b-4ff5-86a7-6d6ff402f3d6
+  LINEAR_LABEL_REPOSITORY_ID: f52d2797-f97c-4bea-b3eb-b05a2c3bafbe
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Linear API configuration
+        id: config
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        run: |
+          if [ -z "$LINEAR_API_KEY" ]; then
+            echo "::notice::LINEAR_API_KEY is not configured; Dependabot to Linear sync is skipped."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create and link Linear issues
+        if: steps.config.outputs.config == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          prs="$(gh api "repos/$REPO/pulls?state=open&per_page=100")"
+
+          echo "$prs" | jq -c '.[] | select(.user.login == "dependabot[bot]")' | while read -r pr; do
+            number="$(jq -r '.number' <<<"$pr")"
+            title="$(jq -r '.title' <<<"$pr")"
+            body="$(jq -r '.body // ""' <<<"$pr")"
+            pr_url="$(jq -r '.html_url' <<<"$pr")"
+
+            if [[ "$title" =~ \[0XF-[0-9]+\] ]]; then
+              echo "PR #$number already contains a Linear identifier; skipping."
+              continue
+            fi
+
+            find_query='query FindIssue($url: String!) { issues(first: 1, filter: { description: { contains: $url } }) { nodes { id identifier title } } }'
+            find_payload="$(jq -n \
+              --arg query "$find_query" \
+              --arg url "$pr_url" \
+              '{query: $query, variables: {url: $url}}')"
+
+            find_response="$(curl --fail-with-body --silent --show-error \
+              -H 'Content-Type: application/json' \
+              -H "Authorization: $LINEAR_API_KEY" \
+              --data "$find_payload" \
+              "$LINEAR_API_URL")"
+
+            existing_identifier="$(jq -r '.data.issues.nodes[0].identifier // empty' <<<"$find_response")"
+            if [ -n "$existing_identifier" ]; then
+              gh api --method PATCH "repos/$REPO/pulls/$number" \
+                -f title="[$existing_identifier] $title" >/dev/null
+              echo "::notice::Recovered existing Linear issue $existing_identifier for PR #$number."
+              continue
+            fi
+
+            priority=3
+            secondary_label="$LINEAR_LABEL_MAINTENANCE_ID"
+            classification="dependency maintenance"
+
+            if grep -Eqi '(CVE-[0-9]{4}-[0-9]+|GHSA-[A-Za-z0-9-]+|vulnerab|security update|security advisory)' <<<"$body"; then
+              priority=2
+              secondary_label="$LINEAR_LABEL_SECURITY_ID"
+              classification="security dependency update"
+            fi
+
+            linear_title="[Dependencies] $title"
+            description="$(cat <<EOF
+## Source
+
+Dependabot pull request.
+
+## Traceability
+
+- Repository: \`$REPO\`
+- Pull request: $pr_url
+- GitHub PR: #$number
+- Classification: **$classification**
+
+## Review expectations
+
+Validate compatibility, automated checks and relevant breaking changes before merge. Security-related dependency updates require explicit risk review and should not be merged solely because the dependency update is automated.
+
+## Evidence
+
+The linked GitHub pull request is the implementation and review evidence for this issue.
+EOF
+)"
+
+            create_query='mutation CreateIssue($input: IssueCreateInput!) { issueCreate(input: $input) { success issue { id identifier title url } } }'
+            create_payload="$(jq -n \
+              --arg query "$create_query" \
+              --arg title "$linear_title" \
+              --arg description "$description" \
+              --arg teamId "$LINEAR_TEAM_ID" \
+              --arg projectId "$LINEAR_PROJECT_ID" \
+              --arg stateId "$LINEAR_STATE_ID" \
+              --arg dependencies "$LINEAR_LABEL_DEPENDENCIES_ID" \
+              --arg secondary "$secondary_label" \
+              --arg repository "$LINEAR_LABEL_REPOSITORY_ID" \
+              --argjson priority "$priority" \
+              '{query: $query, variables: {input: {title: $title, description: $description, teamId: $teamId, projectId: $projectId, stateId: $stateId, priority: $priority, labelIds: [$dependencies, $secondary, $repository]}}}')"
+
+            create_response="$(curl --fail-with-body --silent --show-error \
+              -H 'Content-Type: application/json' \
+              -H "Authorization: $LINEAR_API_KEY" \
+              --data "$create_payload" \
+              "$LINEAR_API_URL")"
+
+            if jq -e '.errors | length > 0' >/dev/null 2>&1 <<<"$create_response"; then
+              echo "::error::Linear API returned GraphQL errors for PR #$number: $(jq -c '.errors' <<<"$create_response")"
+              continue
+            fi
+
+            identifier="$(jq -r '.data.issueCreate.issue.identifier // empty' <<<"$create_response")"
+            if [ -z "$identifier" ]; then
+              echo "::error::Linear issue creation failed for PR #$number."
+              continue
+            fi
+
+            gh api --method PATCH "repos/$REPO/pulls/$number" \
+              -f title="[$identifier] $title" >/dev/null
+
+            echo "::notice::Linked Dependabot PR #$number to Linear issue $identifier."
+          done
