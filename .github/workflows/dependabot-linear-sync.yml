@@ -57,16 +57,13 @@ jobs:
             body="$(jq -r '.body // ""' <<<"$pr")"
             pr_url="$(jq -r '.html_url' <<<"$pr")"
 
-            if [[ "$title" =~ \[0XF-[0-9]+\] ]]; then
+            if [[ "$title" =~ 0XF-[0-9]+ ]]; then
               echo "PR #$number already contains a Linear identifier; skipping."
               continue
             fi
 
             find_query='query FindIssue($url: String!) { issues(first: 1, filter: { description: { contains: $url } }) { nodes { id identifier title } } }'
-            find_payload="$(jq -n \
-              --arg query "$find_query" \
-              --arg url "$pr_url" \
-              '{query: $query, variables: {url: $url}}')"
+            find_payload="$(jq -n --arg query "$find_query" --arg url "$pr_url" '{query: $query, variables: {url: $url}}')"
 
             find_response="$(curl --fail-with-body --silent --show-error \
               -H 'Content-Type: application/json' \
@@ -76,8 +73,7 @@ jobs:
 
             existing_identifier="$(jq -r '.data.issues.nodes[0].identifier // empty' <<<"$find_response")"
             if [ -n "$existing_identifier" ]; then
-              gh api --method PATCH "repos/$REPO/pulls/$number" \
-                -f title="[$existing_identifier] $title" >/dev/null
+              gh api --method PATCH "repos/$REPO/pulls/$number" -f title="$existing_identifier $title" >/dev/null
               echo "::notice::Recovered existing Linear issue $existing_identifier for PR #$number."
               continue
             fi
@@ -146,8 +142,6 @@ EOF
               continue
             fi
 
-            gh api --method PATCH "repos/$REPO/pulls/$number" \
-              -f title="[$identifier] $title" >/dev/null
-
+            gh api --method PATCH "repos/$REPO/pulls/$number" -f title="$identifier $title" >/dev/null
             echo "::notice::Linked Dependabot PR #$number to Linear issue $identifier."
           done
