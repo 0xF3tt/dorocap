@@ -1,0 +1,13 @@
+/dorocap
+/dist/
+/build/
+.claude/
+.DS_Store
+*.local.md
+
+# Engagement data (client evidence) must never land in this public repo.
+scope.yaml
+evidence/
+findings/
+notes/
+report/

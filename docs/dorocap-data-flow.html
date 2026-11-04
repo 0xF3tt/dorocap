@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How dorocap turns capture into a report</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --paper: #f3f1ec;
+      --ink: #2a312e;
+      --muted: #5c665f;
+      --soft: #8a918c;
+      --accent: #d86a2a;
+      --link: #2f6b45;
+      --sans: 'Geist', system-ui, sans-serif;
+      --serif: 'Instrument Serif', Georgia, serif;
+      --mono: 'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+    }
+    .frame { width: 100%; max-width: 1200px; }
+    .eyebrow {
+      margin-bottom: 0.5rem;
+      color: var(--muted);
+      font: 500 0.66rem var(--mono);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin-bottom: 0.75rem;
+      color: var(--ink);
+      font: 400 clamp(1.5rem, 2.4vw + 0.75rem, 2rem)/1.15 var(--serif);
+      letter-spacing: -0.02em;
+    }
+    .lede {
+      max-width: 40rem;
+      margin-bottom: 1.5rem;
+      color: var(--muted);
+      font: 400 0.95rem/1.45 var(--sans);
+    }
+    svg { display: block; width: 100%; min-width: 728px; }
+    .step-number, .step-label, .lane-label, .role-text, .chip-text, .legend-label { font-family: var(--mono); text-anchor: middle; }
+    .step-number { fill: var(--ink); font-size: 7px; font-weight: 600; }
+    .step-label { fill: var(--muted); font-size: 7px; font-weight: 500; letter-spacing: 0.12em; }
+    .lane-label { fill: var(--muted); font-size: 8px; font-weight: 500; letter-spacing: 0.14em; }
+    .role-text { fill: var(--ink); font-size: 6px; font-weight: 600; }
+    .node-title { fill: var(--ink); font: 600 9px var(--sans); text-anchor: middle; }
+    .node-sub { fill: var(--muted); font: 400 6.5px var(--mono); text-anchor: middle; }
+    .node-tool { fill: var(--soft); font: 400 6.5px var(--mono); text-anchor: middle; }
+    .chip-text { fill: #f3f1ec; font-size: 5px; font-weight: 700; }
+    .focal-text { fill: var(--accent); }
+    .legend-label { fill: var(--muted); font-size: 8px; font-weight: 500; letter-spacing: 0.12em; text-anchor: end; }
+    .legend-text { fill: var(--muted); font: 400 8px var(--sans); }
+    .colophon {
+      margin-top: 1rem;
+      color: var(--soft);
+      font: 400 0.75rem var(--mono);
+      letter-spacing: 0.04em;
+    }
+  </style>
+</head>
+<body>
+  <main class="frame">
+    <p class="eyebrow">Data flow · dorocap</p>
+    <h1>How an engagement becomes a report</h1>
+    <p class="lede">Screenshots, notes, and findings become a hashed vault. Export writes a checksum only after verify passes, and finalize copies that exact draft.</p>
+    <img src="dorocap-flow.gif" alt="Files leave a terminal, settle on a vault that turns orange, and a green report slides out" width="800" style="display:block;width:100%;max-width:800px;margin:0 0 1.5rem;border:0;">
+
+    <svg viewBox="0 0 728 436" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="dorocap-flow-title dorocap-flow-desc">
+      <title id="dorocap-flow-title">How dorocap turns capture into a report</title>
+      <desc id="dorocap-flow-desc">An operator records scope, dorocap stores hashed evidence, verify must pass before export writes a draft checksum, and finalize promotes that exact draft.</desc>
+      <defs>
+        <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">
+          <circle cx="11" cy="11" r="0.8" fill="rgba(42,49,46,0.10)"/>
+        </pattern>
+        <marker id="arr-muted" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="#5c665f"/></marker>
+        <marker id="arr-accent" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="#d86a2a"/></marker>
+        <marker id="arr-link" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="#2f6b45"/></marker>
+      </defs>
+
+      <rect width="728" height="436" fill="#f3f1ec"/>
+      <rect width="728" height="436" fill="url(#dots)"/>
+      <rect x="0" y="36" width="728" height="80" fill="rgba(42,49,46,0.018)"/>
+      <rect x="0" y="196" width="728" height="80" fill="rgba(42,49,46,0.018)"/>
+
+      <line x1="0" y1="36" x2="728" y2="36" stroke="rgba(42,49,46,0.12)" stroke-width="0.8"/>
+      <line x1="0" y1="116" x2="728" y2="116" stroke="rgba(42,49,46,0.12)" stroke-width="0.8"/>
+      <line x1="0" y1="196" x2="728" y2="196" stroke="rgba(42,49,46,0.12)" stroke-width="0.8"/>
+      <line x1="0" y1="276" x2="728" y2="276" stroke="rgba(42,49,46,0.12)" stroke-width="0.8"/>
+      <line x1="0" y1="356" x2="728" y2="356" stroke="rgba(42,49,46,0.12)" stroke-width="0.8"/>
+      <line x1="140" y1="36" x2="140" y2="356" stroke="rgba(42,49,46,0.12)" stroke-width="0.8"/>
+
+      <g aria-label="Pipeline steps">
+        <rect x="180" y="6" width="32" height="16" rx="8" fill="rgba(42,49,46,0.12)"/>
+        <text x="196" y="14" class="step-number">01</text>
+        <text x="196" y="29" class="step-label">SCOPE</text>
+        <rect x="292" y="6" width="32" height="16" rx="8" fill="rgba(42,49,46,0.12)"/>
+        <text x="308" y="14" class="step-number">02</text>
+        <text x="308" y="29" class="step-label">CAPTURE</text>
+        <rect x="404" y="6" width="32" height="16" rx="8" fill="rgba(216,106,42,0.20)"/>
+        <text x="420" y="14" class="step-number focal-text">03</text>
+        <text x="420" y="29" class="step-label focal-text">VERIFY</text>
+        <rect x="516" y="6" width="32" height="16" rx="8" fill="rgba(42,49,46,0.12)"/>
+        <text x="532" y="14" class="step-number">04</text>
+        <text x="532" y="29" class="step-label">EXPORT</text>
+        <rect x="628" y="6" width="32" height="16" rx="8" fill="rgba(42,49,46,0.12)"/>
+        <text x="644" y="14" class="step-number">05</text>
+        <text x="644" y="29" class="step-label">SEAL</text>
+      </g>
+
+      <g aria-label="Roles">
+        <text x="70" y="72" class="lane-label">OPERATOR</text>
+        <text x="70" y="84" class="lane-label">FIELD</text>
+        <text x="70" y="152" class="lane-label">DOROCAP</text>
+        <text x="70" y="164" class="lane-label">CLI</text>
+        <text x="70" y="232" class="lane-label">EVIDENCE</text>
+        <text x="70" y="244" class="lane-label">VAULT</text>
+        <text x="70" y="312" class="lane-label">CLIENT</text>
+        <text x="70" y="324" class="lane-label">REPORT</text>
+      </g>
+
+      <!-- Connectors before nodes. One elbow per cross-lane path, r=8. -->
+      <path d="M246 76 H300 Q308 76 308 84 V124" fill="none" stroke="#5c665f" stroke-dasharray="4 3" marker-end="url(#arr-muted)"/>
+      <path d="M308 188 V204" fill="none" stroke="#5c665f" marker-end="url(#arr-muted)"/>
+      <path d="M358 236 H412 Q420 236 420 228 V188" fill="none" stroke="#d86a2a" stroke-width="1.2" marker-end="url(#arr-accent)"/>
+      <rect x="364" y="216" width="48" height="12" rx="2" fill="#f3f1ec"/>
+      <text x="388" y="225" fill="#d86a2a" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">SHA-256</text>
+      <path d="M470 156 H482" fill="none" stroke="#5c665f" marker-end="url(#arr-muted)"/>
+      <path d="M532 188 V284" fill="none" stroke="#5c665f" marker-end="url(#arr-muted)"/>
+      <path d="M582 316 H594" fill="none" stroke="#2f6b45" marker-end="url(#arr-link)"/>
+
+      <!-- Scope -->
+      <rect x="146" y="44" width="100" height="64" rx="6" fill="#f3f1ec"/>
+      <rect x="146" y="44" width="100" height="64" rx="6" fill="#f3f1ec" stroke="rgba(42,49,46,0.25)"/>
+      <rect x="150" y="48" width="18" height="10" rx="2" fill="rgba(42,49,46,0.12)"/>
+      <text x="159" y="55" class="role-text">OPR</text>
+      <text x="196" y="67" class="node-title">Scope</text>
+      <text x="196" y="79" class="node-sub">scope.yaml</text>
+      <text x="196" y="91" class="node-tool">engagement root</text>
+      <rect x="226" y="98" width="16" height="8" rx="2" fill="#2f6b45"/>
+      <text x="234" y="104" class="chip-text">FL</text>
+
+      <!-- Capture -->
+      <rect x="258" y="124" width="100" height="64" rx="6" fill="#f3f1ec"/>
+      <rect x="258" y="124" width="100" height="64" rx="6" fill="#ffffff" stroke="rgba(42,49,46,0.25)"/>
+      <rect x="262" y="128" width="18" height="10" rx="2" fill="rgba(42,49,46,0.12)"/>
+      <text x="271" y="135" class="role-text">CLI</text>
+      <text x="308" y="147" class="node-title">Capture</text>
+      <text x="308" y="159" class="node-sub">ss, note, finding</text>
+      <text x="308" y="171" class="node-tool">dorocap</text>
+      <rect x="338" y="178" width="16" height="8" rx="2" fill="#5c665f"/>
+      <text x="346" y="184" class="chip-text">DB</text>
+
+      <!-- Evidence -->
+      <rect x="258" y="204" width="100" height="64" rx="6" fill="#f3f1ec"/>
+      <rect x="258" y="204" width="100" height="64" rx="6" fill="rgba(42,49,46,0.05)" stroke="#5c665f"/>
+      <rect x="262" y="208" width="18" height="10" rx="2" fill="rgba(42,49,46,0.12)"/>
+      <text x="271" y="215" class="role-text">VLT</text>
+      <text x="308" y="227" class="node-title">Evidence</text>
+      <text x="308" y="239" class="node-sub">file plus sidecar</text>
+      <text x="308" y="251" class="node-tool">owner-only files</text>
+      <rect x="262" y="258" width="16" height="8" rx="2" fill="#5c665f"/>
+      <text x="270" y="264" class="chip-text">DB</text>
+      <rect x="338" y="258" width="16" height="8" rx="2" fill="#5c665f"/>
+      <text x="346" y="264" class="chip-text">DB</text>
+
+      <!-- Verify, the focal node -->
+      <rect x="370" y="124" width="100" height="64" rx="6" fill="#f3f1ec"/>
+      <rect x="370" y="124" width="100" height="64" rx="6" fill="rgba(216,106,42,0.08)" stroke="#d86a2a" stroke-width="1.2"/>
+      <rect x="374" y="128" width="18" height="10" rx="2" fill="rgba(216,106,42,0.20)"/>
+      <text x="383" y="136" class="role-text focal-text">CLI</text>
+      <text x="420" y="147" class="node-title">Verify</text>
+      <text x="420" y="159" class="node-sub">hashes and links</text>
+      <text x="420" y="171" class="node-tool">dorocap verify</text>
+      <rect x="374" y="178" width="16" height="8" rx="2" fill="#5c665f"/>
+      <text x="382" y="184" class="chip-text">DB</text>
+      <rect x="450" y="178" width="16" height="8" rx="2" fill="#5c665f"/>
+      <text x="458" y="184" class="chip-text">DB</text>
+
+      <!-- Export -->
+      <rect x="482" y="124" width="100" height="64" rx="6" fill="#f3f1ec"/>
+      <rect x="482" y="124" width="100" height="64" rx="6" fill="#ffffff" stroke="rgba(42,49,46,0.25)"/>
+      <rect x="486" y="128" width="18" height="10" rx="2" fill="rgba(42,49,46,0.12)"/>
+      <text x="495" y="135" class="role-text">CLI</text>
+      <text x="532" y="147" class="node-title">Export</text>
+      <text x="532" y="159" class="node-sub">draft plus checksum</text>
+      <text x="532" y="171" class="node-tool">dorocap export</text>
+      <rect x="486" y="178" width="16" height="8" rx="2" fill="#5c665f"/>
+      <text x="494" y="184" class="chip-text">DB</text>
+      <rect x="562" y="178" width="16" height="8" rx="2" fill="#2f6b45"/>
+      <text x="570" y="184" class="chip-text">FL</text>
+
+      <!-- Draft -->
+      <rect x="482" y="284" width="100" height="64" rx="6" fill="#f3f1ec"/>
+      <rect x="482" y="284" width="100" height="64" rx="6" fill="#ffffff" stroke="rgba(42,49,46,0.25)"/>
+      <rect x="486" y="288" width="18" height="10" rx="2" fill="rgba(42,49,46,0.12)"/>
+      <text x="495" y="295" class="role-text">RPT</text>
+      <text x="532" y="307" class="node-title">Draft report</text>
+      <text x="532" y="319" class="node-sub">report.md.sha256</text>
+      <text x="532" y="331" class="node-tool">report/draft</text>
+      <rect x="486" y="338" width="16" height="8" rx="2" fill="#2f6b45"/>
+      <text x="494" y="344" class="chip-text">FL</text>
+      <rect x="562" y="338" width="16" height="8" rx="2" fill="#2f6b45"/>
+      <text x="570" y="344" class="chip-text">FL</text>
+
+      <!-- Final -->
+      <rect x="594" y="284" width="100" height="64" rx="6" fill="#f3f1ec"/>
+      <rect x="594" y="284" width="100" height="64" rx="6" fill="#ffffff" stroke="rgba(42,49,46,0.25)"/>
+      <rect x="598" y="288" width="18" height="10" rx="2" fill="rgba(42,49,46,0.12)"/>
+      <text x="607" y="295" class="role-text">RPT</text>
+      <text x="644" y="307" class="node-title">Final report</text>
+      <text x="644" y="319" class="node-sub">promoted copy</text>
+      <text x="644" y="331" class="node-tool">report/final</text>
+      <rect x="598" y="338" width="16" height="8" rx="2" fill="#2f6b45"/>
+      <text x="606" y="344" class="chip-text">FL</text>
+
+      <text x="164" y="376" class="legend-label">STEPS</text>
+      <rect x="180" y="368" width="24" height="12" rx="6" fill="rgba(42,49,46,0.12)"/>
+      <text x="192" y="376" class="step-number">01</text>
+      <text x="212" y="377" class="legend-text">Scope</text>
+      <rect x="268" y="368" width="24" height="12" rx="6" fill="rgba(42,49,46,0.12)"/>
+      <text x="280" y="376" class="step-number">02</text>
+      <text x="300" y="377" class="legend-text">Capture</text>
+      <rect x="372" y="368" width="24" height="12" rx="6" fill="rgba(216,106,42,0.20)"/>
+      <text x="384" y="376" class="step-number focal-text">03</text>
+      <text x="404" y="377" class="legend-text">Verify</text>
+      <rect x="464" y="368" width="24" height="12" rx="6" fill="rgba(42,49,46,0.12)"/>
+      <text x="476" y="376" class="step-number">04</text>
+      <text x="496" y="377" class="legend-text">Export</text>
+      <rect x="556" y="368" width="24" height="12" rx="6" fill="rgba(42,49,46,0.12)"/>
+      <text x="568" y="376" class="step-number">05</text>
+      <text x="588" y="377" class="legend-text">Seal</text>
+
+      <text x="164" y="396" class="legend-label">DATA</text>
+      <rect x="180" y="388" width="16" height="8" rx="2" fill="#5c665f"/>
+      <text x="188" y="394" class="chip-text">DB</text>
+      <text x="204" y="396" class="legend-text">Evidence file</text>
+      <rect x="292" y="388" width="16" height="8" rx="2" fill="#2f6b45"/>
+      <text x="300" y="394" class="chip-text">FL</text>
+      <text x="316" y="396" class="legend-text">Report file</text>
+      <text x="400" y="396" class="legend-text">left chip = input, right chip = output</text>
+
+      <text x="164" y="420" class="legend-label">FLOW</text>
+      <line x1="180" y1="416" x2="204" y2="416" stroke="#5c665f" stroke-dasharray="4 3" marker-end="url(#arr-muted)"/>
+      <text x="212" y="420" class="legend-text">Scope enables</text>
+      <line x1="312" y1="416" x2="336" y2="416" stroke="#5c665f" marker-end="url(#arr-muted)"/>
+      <text x="344" y="420" class="legend-text">Handoff</text>
+      <line x1="412" y1="416" x2="436" y2="416" stroke="#d86a2a" stroke-width="1.2" marker-end="url(#arr-accent)"/>
+      <text x="444" y="420" class="legend-text">Verify gate</text>
+      <line x1="532" y1="416" x2="556" y2="416" stroke="#2f6b45" marker-end="url(#arr-link)"/>
+      <text x="564" y="420" class="legend-text">Sealed report</text>
+    </svg>
+    <p class="colophon">Paper #f3f1ec · Ink #2a312e · Accent #d86a2a · Report #2f6b45</p>
+  </main>
+</body>
+</html>
