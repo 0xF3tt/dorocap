@@ -4,9 +4,10 @@ VERSION  := $(shell git describe --tags --match 'v*' --dirty 2>/dev/null || echo
 LDFLAGS  := -s -w -X main.version=$(VERSION)
 DIST     := dist
 
-# `make tools-check` installs into GOPATH/bin; find those tools even when the
-# calling shell (or a pre-commit hook) has no GOPATH/bin on its PATH.
-export PATH := $(shell go env GOPATH)/bin:$(PATH)
+# `make tools-check` installs the pinned tools here. Call them by path: a shell
+# or pre-commit hook without this directory on PATH still finds them, and an
+# unpinned copy elsewhere on PATH is never used.
+TOOLBIN  := $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)
 
 PLATFORMS := darwin/amd64 darwin/arm64 linux/amd64 linux/arm64
 
@@ -43,14 +44,14 @@ fmt:
 
 ## lint: full static-analysis gate (fmt + vet + staticcheck + golangci-lint)
 lint: fmt vet
-	staticcheck ./...
+	$(TOOLBIN)/staticcheck ./...
 	golangci-lint run ./...
 
 ## audit: security scan gate (gitleaks + gosec + govulncheck)
 audit:
-	gitleaks detect --redact --no-git --source .
-	gosec -quiet ./...
-	govulncheck ./...
+	$(TOOLBIN)/gitleaks detect --redact --no-git --source .
+	$(TOOLBIN)/gosec -quiet ./...
+	$(TOOLBIN)/govulncheck ./...
 
 ## install: build and install to GOPATH/bin
 install:
@@ -73,7 +74,7 @@ tools: tools-check
 ## -buildvcs=false keeps the binary free of the local checkout path. The
 ## CycloneDX file is a source SBOM, not a description of the compiled binary.
 release: test-race lint audit
-	@command -v cyclonedx-gomod >/dev/null || (echo "cyclonedx-gomod not found: make tools" && exit 1)
+	@test -x $(TOOLBIN)/cyclonedx-gomod || (echo "cyclonedx-gomod not found: make tools" && exit 1)
 	@rm -rf $(DIST)
 	@mkdir -p $(DIST)
 	@for p in $(PLATFORMS); do \
@@ -83,6 +84,6 @@ release: test-race lint audit
 		echo "building $$out"; \
 		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath -buildvcs=false -ldflags "$(LDFLAGS)" -o $$out . || exit 1; \
 		done
-	@cyclonedx-gomod mod -json -output $(DIST)/sbom.cdx.json .
+	@$(TOOLBIN)/cyclonedx-gomod mod -json -output $(DIST)/sbom.cdx.json .
 	@cd $(DIST) && (sha256sum * > SHA256SUMS 2>/dev/null || shasum -a 256 * > SHA256SUMS)
 	@cat $(DIST)/SHA256SUMS
