@@ -56,3 +56,8 @@ updates:
       tools-non-major:
         patterns: ["*"]
         update-types: ["minor", "patch"]
+      # One PR for all tool security fixes: main requires up-to-date branches,
+      # so every separate PR would need its own rebase after each merge.
+      tools-security:
+        applies-to: security-updates
+        patterns: ["*"]
