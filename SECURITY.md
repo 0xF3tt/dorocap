@@ -1,70 +1,55 @@
 # Security Policy
 
-## Supported Versions
+## Supported versions
 
-dorocap is pre-1.0. Only the latest release is supported — please update
-before reporting an issue.
+dorocap is pre-1.0. Only the latest release gets fixes, so update before you
+report an issue. Only macOS and Linux are supported.
 
-## Reporting a Vulnerability
+## Reporting a vulnerability
 
-Please report vulnerabilities privately via GitHub's
-[Security Advisories](https://github.com/0xF3tt/dorocap/security/advisories/new)
-rather than a public issue.
+Report vulnerabilities privately through
+[GitHub Security Advisories](https://github.com/0xF3tt/dorocap/security/advisories/new),
+not in a public issue. Include the steps to reproduce and the affected version
+or commit.
 
-Include reproduction steps and the affected version/commit. Likely areas of
-impact include evidence integrity, path or symlink handling, permissions,
-malformed engagement data, native screenshot invocation, and the release/build
-pipeline.
+A bug matters most in evidence integrity, path and symlink handling, file
+permissions, malformed engagement files, the screenshot tools dorocap runs,
+and the release pipeline.
 
-## Security Model
+## Security model
 
-- Evidence files and sidecars are created with owner-only file permissions.
-  Engagement directories are owner-only (`0700`) as well, so other local users
-  cannot list evidence filenames. On Windows, directory ACLs follow the
-  process defaults.
-- Screenshots are staged in a private system-temporary directory and then
-  copied into the engagement with an atomic same-directory rename. Temporary
-  capture data is removed after success or failure. macOS capture runs
-  `/usr/sbin/screencapture`. On Linux, `import` is used only when that
-  absolute path identifies itself as ImageMagick.
-- Imported and captured evidence receives a SHA-256 sidecar. The sidecar
-  records the operator workstation hostname. Delivering the evidence tree
-  therefore reveals that name. `dorocap verify` detects missing, modified,
-  orphaned, incorrectly typed, or incorrectly linked evidence, but a checksum
-  is not a signed chain-of-custody record.
-- Findings, notes, and `scope.yaml` are operator records. They are not covered
-  by the evidence checksum. A report that says verification passed is not a
-  signature over the finding text.
-- Commands that look for an engagement walk parent directories and stop at the
-  home directory. Outside the home directory they also stop before entering a
-  directory owned by someone else. `dorocap path` refuses a vault the current
-  user does not own. Windows skips the owner check.
-- Finding links resolve symlinks before containment-checking against the
-  engagement evidence root, reject sidecar files, and require a valid checksum
-  before being recorded. Vault verification reports symlink entries as invalid
-  evidence.
-- `dorocap export` writes `report/draft/report.md` and, only when evidence
-  verification succeeds, `report/draft/report.md.sha256`. Verification failure
-  still writes the draft so the warnings are visible, removes any previous
-  checksum, and exits non-zero.
-- `dorocap finalize` re-verifies the evidence vault and copies the draft into
-  `report/final/` only when the draft bytes match that checksum. It does not
-  regenerate the draft. After a hand edit, `dorocap finalize --accept-edits`
-  records the edited bytes and then promotes them. Evidence verification still
-  has to succeed.
-- Generated Markdown reports use relative evidence links. Keep the report with
-  its engagement directory, or include the evidence tree when transferring it,
-  so linked evidence remains available.
-- Shell completion reads finding metadata and evidence sidecars from the active
-  engagement. It does not modify evidence. Dynamic evidence completion offers
-  only files that currently pass verification.
-- Terminal styling is disabled for redirected output, `TERM=dumb`,
-  `NO_COLOR`, and legacy Windows CMD detection. Nerd Font private-use glyphs
-  are opt-in so untrusted terminal/font assumptions do not alter default output.
-- The global engagement path is local user configuration. Use `dorocap info`
-  before capturing sensitive material to confirm the active destination.
+- **Permissions.** dorocap creates folders with mode `0700` and files with mode
+  `0600`, so other local users cannot list or read an engagement.
+- **Capture.** Screenshots are written to a private temporary folder and moved
+  into the engagement with an atomic rename. The temporary data is removed
+  whether the capture succeeds or fails. On macOS dorocap runs
+  `/usr/sbin/screencapture`. On Linux it runs `import` only if that binary
+  identifies itself as ImageMagick.
+- **Hashes, not signatures.** Every capture gets a SHA-256 sidecar.
+  `dorocap verify` detects missing, modified, orphaned, misfiled, or wrongly
+  linked evidence. A checksum is not a signed chain-of-custody record.
+- **Host name.** Each sidecar records the host name of the machine that made
+  the capture, so delivering the evidence folder reveals that name.
+- **Operator records.** Findings, notes, and `scope.yaml` are not hashed. A
+  report that says verification passed does not vouch for the finding text.
+- **Engagement lookup.** Commands search parent folders for `scope.yaml` and
+  stop at your home folder. Outside your home folder, they also stop before a
+  folder owned by another user. `dorocap path` refuses an engagement you do not
+  own. Run `dorocap info` before capturing sensitive material to confirm where
+  it will be saved.
+- **Links.** `finding link` resolves symlinks before checking that the path is
+  inside `evidence/`, refuses sidecars, and requires a valid hash. `verify`
+  reports symlinks as invalid evidence.
+- **Report checksum.** `export` writes `report/draft/report.md.sha256` only when
+  verification passes. On failure it removes any old checksum and exits with
+  an error. `finalize` verifies the evidence again and copies the draft only if
+  it still matches that checksum. `finalize --accept-edits` records a new
+  checksum for a hand-edited draft, and verification must still pass.
+- **Relative links.** Reports link to evidence by relative path. Keep a report
+  with its engagement folder, or send the evidence folder with it.
+- **Completion.** Shell completion only reads findings and sidecars, and it
+  offers only evidence that currently passes verification.
 
-Treat the engagement directory, generated reports, shell history, and terminal
-completion output as potentially sensitive client data. Apply disk encryption,
-access controls, retention requirements, and secure deletion procedures that
-match the engagement's rules of engagement.
+Treat engagement folders, reports, shell history, and completion output as
+client data. Use the disk encryption, access controls, retention, and secure
+deletion that the engagement's rules of engagement require.

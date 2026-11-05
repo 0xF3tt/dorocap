@@ -19,6 +19,25 @@ func withWorkingDirectory(t *testing.T, dir string) {
 	t.Cleanup(func() { _ = os.Chdir(old) })
 }
 
+func TestNewEngagementReportCreditsNoDefaultAuthor(t *testing.T) {
+	parent := t.TempDir()
+	withWorkingDirectory(t, parent)
+	t.Setenv("DOROCAP_CONFIG", filepath.Join(t.TempDir(), "config"))
+	if err := cmdInit([]string{"acme-2026"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmdExport(nil); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(filepath.Join(parent, "acme-2026", "report", "draft", "report.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report := string(b); !strings.Contains(report, "- **Prepared by:** _(not specified)_") || strings.Contains(report, "0xF3tt") {
+		t.Fatalf("report from an unedited scope.yaml credits an author:\n%s", report)
+	}
+}
+
 func TestInitPathInfoAndScope(t *testing.T) {
 	parent := t.TempDir()
 	withWorkingDirectory(t, parent)
@@ -29,7 +48,7 @@ func TestInitPathInfoAndScope(t *testing.T) {
 	}
 	root := filepath.Join(parent, "acme-2026")
 	scope, err := loadScope(root)
-	if err != nil || scope.Engagement != "acme-2026" || scope.PreparedBy != "@0xF3tt" || len(scope.Methodology) == 0 {
+	if err != nil || scope.Engagement != "acme-2026" || scope.PreparedBy != "" || len(scope.Methodology) == 0 {
 		t.Fatalf("scope=%+v err=%v", scope, err)
 	}
 	if engagementName(root) != "acme-2026" {

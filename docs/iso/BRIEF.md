@@ -1,13 +1,36 @@
-# dorocap isometric GIF
+# The README GIF
 
-Kind: silent explainer, eight seconds.
-Style: isometric (2:1 grid, three flat tones per material, crisp edges). Chosen because the product is a set of boxes: a terminal, a vault, a report.
-Shape: 1280×720 source, delivered as `docs/dorocap-flow.gif` at 800×450, 12 fps.
-Sound: none. A GIF cannot carry audio.
-Characters: none. Objects only, so the piece does not invent a person.
+`docs/dorocap-flow.gif` is a 22-second loop that shows how dorocap works, in
+five chapters. It is drawn entirely in code from
+[`dorocapFlow.ts`](dorocapFlow.ts), with no image assets.
 
-Idea: files leave the terminal, settle on a vault, the vault turns orange while hash marks appear, and a green report slides out with a check.
+| Chapter | On screen | README section |
+|---|---|---|
+| 01 init | `dorocap init acme-2026` builds the scope file, an evidence cabinet with one drawer per category, a findings board, and the draft and final trays | Quick start, Engagement folder |
+| 02 capture | `ss exploitation`, then `ss file nmap.txt`: each capture drops into its drawer and leaves an orange SHA-256 tag (its sidecar) on the drawer front | Capture evidence |
+| 03 finding | `finding add -i` pins a finding to the board; `finding link 0001 ...` ties it to the exploitation capture | Findings, Link evidence to a finding |
+| 04 verify | a scanner bar sweeps the drawers and the finding; every tag and the link get a green check | Verify, export, and finalize |
+| 05 report | `export` writes the draft with its own orange checksum tag; `finalize` copies that exact draft into the final tray and seals the copy | Verify, export, and finalize |
 
-Simplification: the GIF has no words. `dorocap verify`, the checksum file, and `finalize` are named in `docs/dorocap-data-flow.html`. The orange vault is the verify gate. The green slab is the sealed report.
+Orange marks hashes. Green marks what passed `verify` and the sealed final
+report. The colors come from
+[`docs/dorocap-data-flow.html`](../dorocap-data-flow.html).
 
-Source: `docs/iso/dorocapFlow.ts`, drawn with the anidoodle isometric kit.
+Simplified on purpose:
+
+- Notes are not shown.
+- The link command is shortened to `finding link 0001 ...`.
+- The seal stands for the copy in `report/final/`; dorocap does not stamp files.
+- The last half second rewinds the scene so the loop restarts cleanly.
+
+## Changing the GIF
+
+`dorocapFlow.ts` draws any frame from its frame number alone. A cue table at
+the top sets when each event happens, in frames at 30 fps, and is checked when
+the module loads, so a mistimed cue fails right away.
+
+The file imports the anidoodle engine (`core`, `film`, `drafting`,
+`isometricKit`), which is not part of this repository, so rendering needs that
+engine. The delivered GIF is 960×540 at 15 fps with one 256-color palette, and
+weighs about 410 KB. Keep it under 500 KB, the limit of the pre-commit
+`check-added-large-files` hook.

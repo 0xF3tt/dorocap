@@ -51,12 +51,12 @@ func cmdExport(args []string) error {
 	assessmentType := valueOr(scope.AssessmentType, "Penetration Test")
 	classification := valueOr(scope.Classification, "Confidential")
 	version := valueOr(scope.ReportVersion, "0.1")
-	preparedBy := valueOr(scope.PreparedBy, "@0xF3tt")
+	preparedBy := displayMarkdown(scope.PreparedBy)
 	fmt.Fprintf(&b, "# %s Report\n\n", markdownText(assessmentType))
 	fmt.Fprintf(&b, "## %s\n\n", markdownText(scope.Engagement))
 	fmt.Fprintf(&b, "> **Classification:** %s\n\n", markdownText(classification))
 	fmt.Fprintf(&b, "- **Client:** %s\n", displayMarkdown(scope.Client))
-	fmt.Fprintf(&b, "- **Prepared by:** %s\n", markdownText(preparedBy))
+	fmt.Fprintf(&b, "- **Prepared by:** %s\n", preparedBy)
 	fmt.Fprintf(&b, "- **Report version:** %s\n", markdownText(version))
 	fmt.Fprintf(&b, "- **Report date:** %s\n", generated.Format("2006-01-02"))
 	fmt.Fprintf(&b, "- **Testing period:** %s to %s\n", displayMarkdown(scope.StartDate), displayMarkdown(scope.EndDate))
@@ -64,7 +64,7 @@ func cmdExport(args []string) error {
 	b.WriteString("\n## Document Control\n\n")
 	b.WriteString("| Version | Date | Author | Changes |\n|---|---|---|---|\n")
 	if len(scope.RevisionHistory) == 0 {
-		fmt.Fprintf(&b, "| %s | %s | %s | Generated draft |\n", markdownCell(markdownText(version)), generated.Format("2006-01-02"), markdownCell(markdownText(preparedBy)))
+		fmt.Fprintf(&b, "| %s | %s | %s | Generated draft |\n", markdownCell(markdownText(version)), generated.Format("2006-01-02"), markdownCell(preparedBy))
 	} else {
 		for _, revision := range scope.RevisionHistory {
 			fmt.Fprintf(&b, "| %s | %s | %s | %s |\n", markdownCell(markdownText(revision.Version)), markdownCell(markdownText(revision.Date)), markdownCell(markdownText(revision.Author)), markdownCell(markdownText(revision.Changes)))

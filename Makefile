@@ -73,7 +73,6 @@ release: test-race lint audit
 	@for p in $(PLATFORMS); do \
 		os=$${p%/*}; arch=$${p#*/}; \
 		out=$(DIST)/$(BINARY)-$(VERSION)-$$os-$$arch; \
-		[ "$$os" = "windows" ] && out=$$out.exe; \
 		echo "building $$out"; \
 		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath -buildvcs=false -ldflags "$(LDFLAGS)" -o $$out . || exit 1; \
 		done

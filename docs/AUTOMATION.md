@@ -44,10 +44,9 @@ no workflow files or action pins to maintain.
 | Dependabot | Monthly | Propose grouped GitHub Actions and Go module updates | Dependency pull requests |
 | Release | A maintainer pushes `v*` | Re-run gates, build artifacts, and publish a release | Release assets and metadata |
 
-These lanes overlap only where defense in depth is useful. Release repeats the
-quality gates because a tag can be created independently of a prior workflow
-run. CI does not run again after a merge: the ruleset requires an up-to-date
-branch, so the pull request already tested the tree that lands on `main`.
+Release repeats the CI gates because a tag can point at any commit, tested or
+not. CI does not run again after a merge: `main` requires an up-to-date
+branch, so the pull request already tested the exact tree that lands.
 
 ## CI checks
 
@@ -71,16 +70,18 @@ The security job runs:
 - `make audit`: `gitleaks` over the full git history of the checkout, then
   `govulncheck`
 
-`make fmt` is a check: it fails when formatting is wrong and does not rewrite
-source files. Developers apply `gofmt` locally and then rerun the check.
+`make fmt` only checks formatting and never rewrites files. Run `gofmt -w .`
+to fix what it reports.
 
 A `gosec` finding that is a false positive carries a
 `//nolint:gosec // reason` comment on the flagged line. Fix real findings
 instead of suppressing them.
 
-All third-party Actions are pinned to full commit SHAs, and Dependabot proposes
-updates to those pins. The `golangci-lint` binary version is pinned the same
-way in CI and release.
+Every third-party action is pinned to a full commit SHA, and Dependabot
+proposes updates to those pins. The `golangci-lint` binary is different: its
+version (`v2.15.0`) is the `version` input of the action in both workflows,
+and Dependabot does not update it. Bump it by hand in both workflows and in
+the README.
 
 The scanners that `make audit` and `make release` run (`gitleaks`,
 `govulncheck`, `cyclonedx-gomod`) are pinned by version at the top of the
@@ -157,9 +158,8 @@ is the record that this workflow built those bytes; verify it with
 `--signer-workflow 0xF3tt/dorocap/.github/workflows/release.yml` so an
 attestation from any other workflow is rejected.
 
-Creating or pushing the tag remains a human decision. Dependabot does not
-receive tag or release authority. A tag ruleset blocks moving or deleting
-`v*` tags, and immutable releases block replacing published assets.
+Only a maintainer creates tags. A tag ruleset blocks moving or deleting `v*`
+tags, and immutable releases block replacing published assets.
 
 ## Required GitHub configuration
 
