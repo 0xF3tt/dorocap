@@ -106,6 +106,9 @@ and Go modules. Minor and patch updates are grouped to reduce PR noise; major
 updates remain separate so they receive focused review. A seven-day
 `cooldown` skips versions published less than a week ago, which is when most
 hijacked releases are caught and yanked. Security updates ignore the cooldown.
+Security updates for `/tools` arrive as one grouped pull request: `main`
+requires up-to-date branches, so separate pull requests would each need a
+rebase after every merge.
 
 Dependabot never auto-merges in this repository. Its PRs must pass the same CI,
 CodeQL, and human review requirements as other changes.
@@ -135,6 +138,11 @@ The release contains:
 - A build-provenance attestation for the files in `dist/`
 - GitHub-generated release notes
 
+A tag with a suffix, such as `v1.2.3-rc.1`, is published as a prerelease and
+never becomes the latest release. Use one to test a release pipeline change
+before tagging a final version: a published `v*` tag cannot be moved or
+deleted afterwards.
+
 The same Go patch used by CI (`1.27.3`) builds the release. The attestation
 is the record that this workflow built those bytes; verify it with
 `--signer-workflow 0xF3tt/dorocap/.github/workflows/release.yml` so an
@@ -146,12 +154,12 @@ receive tag or release authority. A tag ruleset blocks moving or deleting
 
 ## Required GitHub configuration
 
-The step-by-step repository setup, including every setting below, is in
-[`github-security-setup.md`](github-security-setup.md). Summary:
+The workflows above rely on these repository settings:
 
 1. Keep the repository's default `GITHUB_TOKEN` permission read-only. Grant
    additional permissions at job level only when required.
-2. Create a `main` ruleset requiring a pull request, resolved conversations,
+2. Create a `main` ruleset requiring a pull request merged by squash (the
+   repository allows only squash merges, to match), resolved conversations,
    signed commits, the five CI checks listed above, `analyze (go)`,
    `analyze (actions)`, and code scanning results with no high-severity
    CodeQL alerts. The required checks only prove that CodeQL ran; the code
@@ -160,6 +168,16 @@ The step-by-step repository setup, including every setting below, is in
    blocks updating or deleting `v*` tags. Do not enable Dependabot auto-merge.
 4. In Actions settings, allow only GitHub-owned actions plus
    `golangci/golangci-lint-action@*`, and require full-length SHA pins.
+5. Create the `release` environment before the first tag, with `0xF3tt` as a
+   required reviewer and a `v*` tag-only deployment policy. If it does not
+   exist, GitHub creates it on the first release with no reviewer, and the
+   approval gate silently disappears. Turn off administrator bypass so the
+   approval applies to every account.
+6. Turn on immutable releases before the first tag. They apply only to
+   releases created afterwards.
+7. Keep Dependabot alerts and security updates, private vulnerability
+   reporting, secret scanning, and push protection enabled. Leave CodeQL
+   default setup off: it conflicts with `codeql.yml`.
 
 ## Failure and recovery behavior
 
