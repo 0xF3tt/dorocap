@@ -1,8 +1,9 @@
 name: CI
 
+# Pull requests only. The main ruleset makes every change arrive by PR on an
+# up-to-date branch, so a second run after the merge would test the same tree.
+# The release workflow re-runs every gate on a tag.
 on:
-  push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -40,27 +41,6 @@ jobs:
       - name: Test
         run: go test -race -shuffle=on ./...
 
-  minimum-go:
-    name: minimum Go compatibility (1.26.x)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up minimum supported Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
-        with:
-          go-version: "1.26.x"
-          cache: true
-
-      - name: Build and test
-        run: |
-          go build ./...
-          go test ./...
-
   security:
     name: lint & security audit
     runs-on: ubuntu-latest
@@ -78,31 +58,16 @@ jobs:
           go-version: "1.27.3"
           cache: true
 
-      - name: gofmt
-        run: make fmt
+      - name: gofmt and go vet
+        run: make fmt vet
 
-      - name: go vet
-        run: make vet
-
-      - name: Install pinned lint and audit tools
-        run: make tools-check
-
-      - name: staticcheck
-        run: staticcheck ./...
-
-      - name: golangci-lint
+      - name: golangci-lint (includes staticcheck and gosec)
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.15.0
 
-      - name: gosec
-        run: gosec -quiet ./...
-
-      - name: govulncheck
-        run: govulncheck ./...
-
-      - name: gitleaks
-        run: gitleaks detect --redact --source .
+      - name: gitleaks and govulncheck (versions pinned in the Makefile)
+        run: make audit
 
   dependency-review:
     name: dependency review

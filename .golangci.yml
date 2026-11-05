@@ -1,0 +1,13 @@
+version: "2"
+
+# The default linters (errcheck, govet, ineffassign, staticcheck, unused) plus
+# gosec, so one pinned binary replaces the separate staticcheck and gosec runs.
+linters:
+  enable:
+    - gosec
+  exclusions:
+    rules:
+      # Standalone gosec skips tests; fixtures read and write paths on purpose.
+      - path: _test\.go
+        linters:
+          - gosec

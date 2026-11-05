@@ -459,14 +459,16 @@ against captured evidence.
 
 ```
 make test    # unit tests
-make lint    # vet + staticcheck + golangci-lint
-make audit   # gitleaks + gosec + govulncheck
-make tools   # install pinned lint, audit, release, and SBOM tools
+make lint    # gofmt + vet + golangci-lint (includes staticcheck and gosec)
+make audit   # gitleaks + govulncheck, at the versions pinned in the Makefile
 make release # macOS/Linux binaries, checksums, and CycloneDX SBOM
 ```
 
-See `make help` for the full target list. Before opening a PR, make sure
-`make lint` and `make audit` are both clean and `make test` passes.
+`make lint` needs `golangci-lint` v2.15.0 on your `PATH` (brew or mise).
+`make audit` and `make release` fetch their scanners with `go run`, so they
+need no separate install. See `make help` for the full target list. Before
+opening a PR, make sure `make lint` and `make audit` are both clean and
+`make test` passes.
 
 ## Automation
 

@@ -10,19 +10,17 @@ changes, but a human controls merges and releases.
 flowchart TD
     A[Developer or Dependabot] --> B[Pull request]
     B --> C[CI: build and test on macOS and Linux]
-    B --> D[CI: minimum Go 1.26 compatibility]
     B --> E[CI: formatting, vet, lint, and security audit]
-    B --> F[CodeQL: Go and Actions analysis]
+    B --> F[CodeQL default setup: Go and Actions analysis]
     C --> G{All required checks pass?}
-    D --> G
     E --> G
     F --> G
     G -- No --> H[Fix or close the pull request]
     G -- Yes --> I[Maintainer review]
     I --> J{Human approval?}
     J -- No --> H
-    J -- Yes --> K[Merge to main]
-    K --> L[Normal main-branch CI]
+    J -- Yes --> K[Squash merge to main]
+    K --> L[CodeQL re-analyzes main]
     K --> M{Maintainer pushes a vX.Y.Z tag?}
     M -- No --> N[No release]
     M -- Yes --> O[Release repeats test, lint, and audit gates]
@@ -32,64 +30,77 @@ flowchart TD
     R -- Yes --> Q[Attest and publish GitHub Release]
 ```
 
-There is intentionally no `checks.yml`. The existing `ci.yml` is the single
-general verification workflow; a second workflow containing the same commands
-would add cost and duplicate status checks without adding a security boundary.
+The repository has two workflow files: `ci.yml` for every pull request and
+`release.yml` for version tags. CodeQL, Dependabot, and secret scanning are
+GitHub-managed features configured in the repository settings, so they add
+no workflow files or action pins to maintain.
 
 ## Automation lanes
 
 | Lane | Trigger | Responsibility | Allowed write |
 | --- | --- | --- | --- |
-| CI | Push to `main`, pull request, manual | Build, test, compatibility, lint, and vulnerability gates | None |
-| CodeQL | Push/PR to `main`, weekly, manual | Semantic analysis of Go and GitHub Actions | Code-scanning results only |
-| Dependabot | Monday schedule | Propose GitHub Actions and Go module updates | Dependency pull requests |
-| Issue labels | An issue is opened | Add the `dorocap` label | Issue labels only |
+| CI | Pull request, manual | Build, test, lint, and vulnerability gates | None |
+| CodeQL default setup | Pull request and push to `main`, weekly | Semantic analysis of Go and GitHub Actions | Code-scanning results only |
+| Dependabot | Monthly | Propose grouped GitHub Actions and Go module updates | Dependency pull requests |
 | Release | A maintainer pushes `v*` | Re-run gates, build artifacts, and publish a release | Release assets and metadata |
 
 These lanes overlap only where defense in depth is useful. Release repeats the
 quality gates because a tag can be created independently of a prior workflow
-run.
+run. CI does not run again after a merge: the ruleset requires an up-to-date
+branch, so the pull request already tested the tree that lands on `main`.
 
 ## CI checks
 
-`.github/workflows/ci.yml` creates five status checks:
+`.github/workflows/ci.yml` creates four status checks:
 
 1. `build & test (ubuntu-latest)`
 2. `build & test (macos-latest)`
-3. `minimum Go compatibility (1.26.x)`
-4. `lint & security audit`
-5. `dependency review` (pull requests only)
+3. `lint & security audit`
+4. `dependency review` (pull requests only)
 
-The two operating-system jobs use the pinned current Go toolchain and run a
-race-enabled, shuffled test suite. The compatibility job verifies the minimum
-Go version promised by `go.mod` and the README. The security job runs:
+The two operating-system jobs use the pinned Go toolchain and run a
+race-enabled, shuffled test suite. There is no separate minimum-Go job: the
+compiler rejects syntax newer than the `go 1.26` line in `go.mod`, and the
+`stdversion` check in `go vet` flags standard-library APIs newer than that.
 
-- `gofmt` verification through `make fmt`
-- `go vet`
-- `staticcheck`
-- `golangci-lint`
-- `gosec`
-- `govulncheck`
-- `gitleaks`, over the full git history of the checkout
+The security job runs:
 
-Pull requests also run `dependency review`. That job does not run on a push
-to `main`; the `main` ruleset requires a pull request, so requiring it there
-is safe.
+- `gofmt` verification and `go vet` through `make fmt vet`
+- `golangci-lint`, configured in `.golangci.yml`: the default linters,
+  including `staticcheck`, plus `gosec`
+- `make audit`: `gitleaks` over the full git history of the checkout, then
+  `govulncheck`
 
 `make fmt` is a check: it fails when formatting is wrong and does not rewrite
 source files. Developers apply `gofmt` locally and then rerun the check.
 
-All third-party Actions are pinned to full commit SHAs. Dependabot is the lane
-that proposes updates to those pins. The `golangci-lint` binary version is also
-pinned consistently between CI and release.
+A `gosec` finding that is a false positive carries a
+`//nolint:gosec // reason` comment on the flagged line. Fix real findings
+instead of suppressing them.
+
+All third-party Actions are pinned to full commit SHAs, and Dependabot proposes
+updates to those pins. The `golangci-lint` binary version is pinned the same
+way in CI and release.
+
+The scanners that `make audit` and `make release` run (`gitleaks`,
+`govulncheck`, `cyclonedx-gomod`) are pinned by version at the top of the
+`Makefile` and run with `go run pkg@version`. That builds each tool from its
+own `go.mod` and verifies it against `sum.golang.org`, so the repository needs
+no tools module, and the tools' roughly 150 indirect dependencies stay out of
+Dependabot's graph. Dependabot does not see these versions: bump them by hand,
+`gitleaks` together with its rev in `.pre-commit-config.yaml`.
 
 ## CodeQL
 
-`.github/workflows/codeql.yml` analyzes both `go` and `actions`. Its default
-token remains read-only; only the analysis job receives the additional
-`security-events: write` permission required to upload results. The scheduled
-Saturday run can discover new findings even when the repository has not
-changed.
+CodeQL runs as GitHub's default setup (Settings → Advanced Security → CodeQL
+analysis), not as a workflow file. GitHub selects the languages (Go and GitHub
+Actions), keeps the analysis current, and analyzes every pull request to
+`main`, every push to `main`, and once a week, so new queries can find issues
+in unchanged code. The `main` ruleset's code scanning rule blocks a pull
+request that adds a CodeQL error or a high-severity security alert.
+
+Do not add a CodeQL workflow while default setup is on: GitHub rejects uploads
+from advanced configurations when default setup is enabled.
 
 CodeQL is not redundant with `gosec` or `govulncheck`:
 
@@ -100,15 +111,13 @@ CodeQL is not redundant with `gosec` or `govulncheck`:
 
 ## Dependabot
 
-`.github/dependabot.yml` owns dependency changes. It runs on Monday in the
-`America/Monterrey` timezone and uses separate update queues for GitHub Actions
-and Go modules. Minor and patch updates are grouped to reduce PR noise; major
-updates remain separate so they receive focused review. A seven-day
+`.github/dependabot.yml` owns dependency changes for GitHub Actions and the Go
+module. It runs monthly in the `America/Monterrey` timezone. All version
+updates for an ecosystem, majors included, arrive as one pull request, and all
+security fixes as another. `main` requires up-to-date branches, so every extra
+pull request would mean another rebase after each merge. A seven-day
 `cooldown` skips versions published less than a week ago, which is when most
 hijacked releases are caught and yanked. Security updates ignore the cooldown.
-Security updates for `/tools` arrive as one grouped pull request: `main`
-requires up-to-date branches, so separate pull requests would each need a
-rebase after every merge.
 
 Dependabot never auto-merges in this repository. Its PRs must pass the same CI,
 CodeQL, and human review requirements as other changes.
@@ -121,7 +130,7 @@ runs per tag and splits the work into two jobs:
 
 | Job | Token | Does |
 | --- | --- | --- |
-| `build` | `contents: read`, no OIDC | Installs pinned tools, runs `make release` (test, lint, audit, build), uploads `dist/` |
+| `build` | `contents: read`, no OIDC | Runs `make release` (test, lint, audit, build, SBOM), uploads `dist/` |
 | `publish` | `contents: write`, `id-token: write`, `attestations: write` | Waits for the `release` environment approval, attests `dist/*`, creates the release |
 
 Third-party tooling therefore never runs with a token that can write the
@@ -160,10 +169,9 @@ The workflows above rely on these repository settings:
    additional permissions at job level only when required.
 2. Create a `main` ruleset requiring a pull request merged by squash (the
    repository allows only squash merges, to match), resolved conversations,
-   signed commits, the five CI checks listed above, `analyze (go)`,
-   `analyze (actions)`, and code scanning results with no high-severity
-   CodeQL alerts. The required checks only prove that CodeQL ran; the code
-   scanning rule is what blocks a PR that adds an alert.
+   signed commits, the four CI checks listed above, and code scanning results
+   with no CodeQL errors or high-severity security alerts. The code scanning
+   rule is what gates CodeQL; there is no CodeQL status check to require.
 3. Block force pushes and branch deletion on `main`, and add a tag ruleset that
    blocks updating or deleting `v*` tags. Do not enable Dependabot auto-merge.
 4. In Actions settings, allow only GitHub-owned actions plus
@@ -176,12 +184,12 @@ The workflows above rely on these repository settings:
 6. Turn on immutable releases before the first tag. They apply only to
    releases created afterwards.
 7. Keep Dependabot alerts and security updates, private vulnerability
-   reporting, secret scanning, and push protection enabled. Leave CodeQL
-   default setup off: it conflicts with `codeql.yml`.
+   reporting, secret scanning, and push protection enabled, and CodeQL default
+   setup on for Go and GitHub Actions.
 
 ## Failure and recovery behavior
 
-- A failing CI or CodeQL check blocks merge; fix the PR or close it.
+- A failing CI check or a new CodeQL alert blocks merge; fix the PR or close it.
 - A failed release gate prevents publication. If publication partially fails,
   inspect the draft/release state before retrying; never move or overwrite an
   existing version tag silently.
