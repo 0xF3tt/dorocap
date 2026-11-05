@@ -106,7 +106,7 @@ assessment_type: "Penetration Test"
 testing_mode: ""
 classification: "Confidential"
 report_version: "0.1"
-prepared_by: "@0xF3tt"
+prepared_by: ""
 start_date: ""
 end_date: ""
 executive_summary: ""
@@ -134,7 +134,7 @@ methodology:
 revision_history:
   - version: "0.1"
     date: ""
-    author: "@0xF3tt"
+    author: ""
     changes: "Initial draft"
 `
 	if err := writeFileAtomic(filepath.Join(tmpRoot, markerFile), []byte(scope), 0o600); err != nil {

@@ -3,410 +3,247 @@
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Go Version](https://img.shields.io/badge/go-%3E%3D1.26-00ADD8.svg)
 
-A pentest evidence and reporting helper. Captures screenshots and files into
-a per-engagement evidence vault, tracks findings, and exports a markdown
-report — all from the command line.
+dorocap is a command-line tool for penetration testers. It keeps the evidence
+of each engagement in one folder, tracks findings as Markdown files, and
+exports a Markdown report. Every capture gets a SHA-256 hash, and dorocap
+checks those hashes before it writes or finalizes the report.
 
-![Files leave the terminal, land on a vault, and a checked report slides out](docs/dorocap-flow.gif)
+![Isometric walkthrough: init builds the engagement, each ss capture lands in its evidence drawer with a SHA-256 tag, a finding is linked to its evidence, verify checks every hash, export writes the draft with its checksum, and finalize seals an exact copy](docs/dorocap-flow.gif)
 
-The labeled version of that path is
-[docs/dorocap-data-flow.html](docs/dorocap-data-flow.html). Open the HTML file
-in a browser.
+A labeled diagram of the same flow is in
+[docs/dorocap-data-flow.html](docs/dorocap-data-flow.html). Download it and
+open it in a browser; GitHub shows only its source.
 
 ## Contents
 
-- [Features](#features)
 - [Requirements](#requirements)
 - [Install](#install)
-- [Usage](#usage)
-- [Typical workflow](#typical-workflow)
-- [Shell autocomplete](#shell-autocomplete)
-- [Terminal compatibility](#terminal-compatibility)
+- [Quick start](#quick-start)
+- [Engagement folder](#engagement-folder)
+- [Commands](#commands)
 - [scope.yaml](#scopeyaml)
+- [Shell completion](#shell-completion)
+- [Terminal output](#terminal-output)
 - [Development](#development)
-- [Automation](#automation)
 - [Security](#security)
 - [License](#license)
 
-## Features
-
-- Screenshot and file capture into a per-engagement, per-category evidence tree
-- Atomic evidence capture with collision-resistant names and SHA-256 metadata
-- Vault verification for missing, modified, orphaned, or incorrectly linked evidence
-- Timestamped notes, keyed by category
-- Lightweight findings tracker (plain markdown, no database)
-- Context-aware Zsh, Bash, Fish, and PowerShell completion, including finding IDs and evidence paths
-- Automatic global engagement selection when a new engagement is initialized
-- Scope-aware markdown reports with severity totals, notes, evidence metadata, and warnings
-- Cross-platform release builds for macOS and Linux via `make release`
-
 ## Requirements
 
-- Go 1.26+ to build from source
-- `dorocap ss <type>` (screenshot capture) shells out to a native tool:
-  - macOS: `screencapture` (built in, no setup needed)
-  - Linux: one of `scrot`, `gnome-screenshot`, or ImageMagick's `import`
-  - Windows: native capture is not supported yet — use `dorocap ss file <path>` to import a
-    screenshot taken by another tool instead
+- macOS or Linux. Windows is not supported.
+- Go 1.26 or newer, to build from source.
+- For screenshots, a native capture tool: macOS uses the built-in
+  `screencapture`; Linux needs `scrot`, `gnome-screenshot`, or ImageMagick's
+  `import`.
 
-On macOS, allow your terminal application under **System Settings → Privacy &
-Security → Screen & System Audio Recording**. Dorocap captures into a private
-system-temporary directory before atomically committing the image to the
-engagement, which avoids asking the native tool to write into a protected
-Downloads folder directly.
+On macOS, allow your terminal app under **System Settings → Privacy &
+Security → Screen & System Audio Recording** before your first screenshot.
 
 ## Install
 
-```
+```bash
+git clone https://github.com/0xF3tt/dorocap.git
+cd dorocap
 make install
 ```
 
-Builds and installs to `$(go env GOPATH)/bin`. Make sure that directory is
-on your `PATH`.
+`make install` puts `dorocap` in `$(go env GOPATH)/bin`. Add that directory to
+your `PATH` if it is not there already.
 
-### Verify a release binary
+If you download a binary from the Releases page instead, check its checksum
+and its build attestation before you run it:
 
-Release binaries carry a GitHub build-provenance attestation and a
-`SHA256SUMS` file. Check both before running a download:
-
-```
+```bash
+shasum -a 256 -c SHA256SUMS --ignore-missing
 gh attestation verify dorocap-<version>-<os>-<arch> -R 0xF3tt/dorocap \
   --signer-workflow 0xF3tt/dorocap/.github/workflows/release.yml
-shasum -a 256 -c SHA256SUMS --ignore-missing
 ```
 
-## Usage
-
-```
-dorocap init <engagement-name>          scaffold a new engagement folder
-dorocap ss <type> [note...]             capture a screenshot into evidence/<type>/
-dorocap ss file <src-path> [note...]    copy a file into evidence/files/
-dorocap note <type> <text...>           append a timestamped note
-dorocap finding add --interactive
-dorocap finding add <title> [--severity value] [--asset value] [--status value]
-dorocap finding set <id> --interactive
-dorocap finding set <id> <field> <value>
-dorocap finding link <id> <evidence-path>
-dorocap finding list
-dorocap verify                          verify evidence files, sidecars, hashes, and finding links
-dorocap export                          write the complete draft report to report/draft/report.md
-dorocap finalize                        verify and promote the reviewed draft to report/final/report.md
-dorocap path [<dir>]                    show or set the fallback engagement path
-dorocap info                            show the active engagement and resolution source
-dorocap completion <shell>              generate zsh, bash, fish, or PowerShell autocomplete
-dorocap version                         show the installed version
-```
-
-### Initialize an engagement
+## Quick start
 
 ```bash
-dorocap init acme-2026
+dorocap init acme-2026      # create ./acme-2026 and make it the active engagement
+# Fill in acme-2026/scope.yaml: client, dates, scope, and contacts.
+
+dorocap ss exploitation "Admin session cookie obtained"   # select an area to screenshot
+dorocap ss file ~/Downloads/nmap.txt "Initial port scan"  # import an existing file
+
+dorocap finding add "Unnecessary service exposed" --severity med
+dorocap finding link 0001 evidence/files/<Tab>
+dorocap note recon "Service confirmed from the external network"
+
+dorocap verify              # check every evidence hash
+dorocap export              # write report/draft/report.md
+# Review the draft, then:
+dorocap finalize            # copy it to report/final/report.md
 ```
 
-This creates the engagement structure and immediately makes its absolute path
-the global default. Commands can then be run from any directory. Use
-`dorocap info` to confirm which engagement is active, or `dorocap path <dir>` to
-select a different existing engagement. After initialization, dorocap prints an
-annotated directory tree explaining the purpose of the scope file, each
-evidence category, notes, findings, and report directories, followed by the
-next recommended action. On a color-capable terminal, the tree uses the Neust
-palette for structure, paths, descriptions, and action prompts. `NO_COLOR`
-keeps the complete summary in plain text.
+After `init`, these commands work from any directory. Evidence file names
+start with a timestamp and a random ID, so let Tab complete the path in
+`finding link` (see [Shell completion](#shell-completion)), or copy it from
+the output of `ss`.
 
-### Capture or import evidence with `ss`
+## Engagement folder
 
-Capture a screenshot into one of the evidence categories:
-
-```bash
-dorocap ss exploitation "Admin session cookie obtained"
-```
-
-Screenshot categories are `recon`, `staging`, `exploitation`, and `postex`.
-The trailing description is optional and is saved in the evidence metadata.
-
-Import an existing file instead of taking a screenshot:
-
-```bash
-dorocap ss file ~/Downloads/nmap.txt "Initial port scan"
-```
-
-Every capture is stored with a `.json` sidecar containing its timestamp, host,
-category, optional note, source filename for imports, and SHA-256 hash.
-
-### Create and list findings
-
-For a guided workflow, use interactive mode:
-
-```bash
-dorocap finding add --interactive
-```
-
-Dorocap prompts for each value individually:
+`dorocap init acme-2026` creates this tree in the current directory and prints
+it:
 
 ```text
-Title: SQL injection in login
-Severity (crit/high/med/low/info) [info]: high
-Status (...) [open]:
-Affected asset (host, URL, IP, endpoint, or service): example.com/login
-CVSS score (0.0-10.0): 8.8
-CWE (for example CWE-89): CWE-89
-OWASP category: A03:2021 Injection
-Description: Unsanitized input reaches a SQL query.
-Business impact: Account data may be exposed.
-Technical impact: Database queries can be modified.
-Steps to reproduce: Submit a quote in the username field.
-Remediation: Use parameterized queries.
-References: https://owasp.org/
+acme-2026/
+├── scope.yaml          engagement name, client, dates, scope, and contacts
+├── evidence/           captured artifacts with SHA-256 JSON sidecars
+│   ├── recon/          discovery, enumeration, and mapping evidence
+│   ├── staging/        setup, payload preparation, and pre-exploitation evidence
+│   ├── exploitation/   proof of exploitation and vulnerability evidence
+│   ├── postex/         impact, privilege, persistence, and cleanup evidence
+│   └── files/          files imported with "dorocap ss file"
+├── notes/              timestamped notes grouped by engagement phase
+├── findings/           editable Markdown vulnerability records
+└── report/
+    ├── draft/          generated report from "dorocap export"
+    └── final/          finalized deliverables managed by the operator
 ```
 
-Press Enter to accept a displayed default or skip an optional field. `-i` is a
-short alias for `--interactive`. The non-interactive form remains available for
-scripts and repeatable automation:
+Inside an engagement folder, commands use that engagement. Anywhere else they
+use the active engagement, which `init` sets. `dorocap info` shows which
+engagement is in use, and `dorocap path <dir>` switches to another one.
+
+Each capture is saved next to a `.json` sidecar that records where it came
+from and its SHA-256 hash:
+
+```json
+{
+  "timestamp": "2026-07-10T15:25:48.565649Z",
+  "host": "laptop.local",
+  "type": "file",
+  "note": "Initial port scan",
+  "source": "nmap.txt",
+  "sha256": "f803fb6407e2226360013cb289a728a5b94d76671229fbe70e598789098aac90"
+}
+```
+
+## Commands
+
+```text
+dorocap init <name>                          create ./<name> and make it the active engagement
+dorocap info                                 show the active engagement and how it was found
+dorocap path [<dir>]                         show or set the engagement used outside an engagement folder
+dorocap ss <category> [note...]              take a screenshot into evidence/<category>/
+dorocap ss file <path> [note...]             import a file into evidence/files/
+dorocap note <category> <text...>            append a timestamped note
+dorocap finding add -i                       create a finding, prompting for each field
+dorocap finding add <title> [options]        create a finding in one command
+dorocap finding set <id> -i                  edit a finding, prompting for each field
+dorocap finding set <id> <field> <value>     change one field of a finding
+dorocap finding link <id> <path> [--retest]  link evidence to a finding
+dorocap finding list                         list findings
+dorocap verify                               check evidence files, sidecars, hashes, and links
+dorocap export                               write report/draft/report.md
+dorocap finalize [--accept-edits]            verify, then copy the draft to report/final/
+dorocap completion <shell>                   print a zsh, bash, fish, or powershell completion script
+dorocap version                              print the version
+```
+
+### Capture evidence
+
+Screenshot categories are `recon`, `staging`, `exploitation`, and `postex`.
+`dorocap ss <category>` opens your system's screenshot tool so you can select
+what to capture. The note after the category is optional and is stored in the
+sidecar. `dorocap ss file <path>` copies an existing file into
+`evidence/files/` instead.
+
+### Findings
+
+`dorocap finding add -i` asks for the title, severity, status, asset, CVSS,
+CWE, and OWASP category, then for the description, business and technical
+impact, steps to reproduce, remediation, and references. Press Enter to accept
+a default or skip a field.
+
+| Field | Values | Default |
+| --- | --- | --- |
+| `severity` | `crit`, `high`, `med`, `low`, `info` | `info` |
+| `status` | `open`, `resolved`, `partially-resolved`, `accepted-risk`, `not-applicable` | `open` |
+| `asset` | the affected host, URL, IP, endpoint, or service | |
+| `cvss` | a score from 0.0 to 10.0 | |
+| `cwe`, `owasp` | for example `CWE-89` and `A03:2021 Injection` | |
+| `retest-status` | `not-tested`, `resolved`, `still-vulnerable`, `partially-resolved` | `not-tested` |
+| `retested` | the retest date | |
+
+`finding add` also takes these fields as options (`--severity`, `--status`,
+`--asset`, `--cvss`, `--cwe`, `--owasp`). `finding set` changes any field in
+the table, including the retest fields:
 
 ```bash
 dorocap finding add "SQL injection in login" --severity high \
   --asset example.com/login --cvss 8.8 --cwe CWE-89 --owasp "A03:2021 Injection"
-dorocap finding list
-```
-
-Supported severities are `crit`, `high`, `med`, `low`, and `info`. Severity
-defaults to `info`; status defaults to `open`. `--asset` associates the
-affected host, URL, endpoint, IP, or service with the finding—it is finding
-metadata, not evidence. Optional creation fields are `--status`, `--cvss`,
-`--cwe`, and `--owasp`.
-
-Update metadata later with `finding set`:
-
-```bash
-dorocap finding set 0001 --interactive
-dorocap finding set 0001 asset example.com/login
 dorocap finding set 0001 status partially-resolved
 dorocap finding set 0001 retest-status still-vulnerable
 dorocap finding set 0001 retested 2026-08-20
+dorocap finding set 0001 cvss -    # "-" clears an optional field
 ```
 
-Interactive mode shows every current metadata value. Press Enter to keep it,
-or enter `-` to clear an optional value. The supported fields are severity,
-status, asset, CVSS, CWE, OWASP, retest status, and retested date. The direct
-form also accepts `-` to clear a value. Findings are editable Markdown files under
-`findings/`; their generated sections cover description, business impact,
-technical impact, reproduction, remediation, references, and retest notes.
+`dorocap finding set <id> -i` shows the current values. Press Enter to keep a
+value, or type `-` to clear it.
+
+Each finding is a Markdown file in `findings/`, such as
+`findings/0001-SQL-injection-in-login.md`. Edit its text sections in any
+editor.
 
 ### Link evidence to a finding
 
 ```bash
-dorocap finding link 0001 evidence/exploitation/<captured-file>
+dorocap finding link 0001 evidence/exploitation/<file>
+dorocap finding link 0001 evidence/exploitation/<file> --retest   # evidence from a retest
 ```
 
-`link` records that an evidence file supports a finding; it does not move or
-duplicate the file. Dorocap rejects paths outside the evidence vault, sidecars,
-unverified files, and duplicate links. Linked evidence is placed beneath the
-corresponding finding when the report is exported.
+A link records that the file supports the finding; the file stays where it
+is. dorocap refuses paths outside `evidence/`, sidecar files, files that fail
+verification, and links that already exist. In the report, linked evidence
+appears under its finding.
 
-Link evidence captured during a retest separately:
-
-```bash
-dorocap finding link 0001 evidence/exploitation/<retest-file> --retest
-```
-
-With shell completion enabled, select both values using Tab:
-
-```text
-dorocap finding link <Tab>       # finding IDs
-dorocap finding link 0001 <Tab>  # verified, not-yet-linked evidence
-```
-
-### Add engagement notes
+### Notes
 
 ```bash
 dorocap note recon "Ports 22, 80, and 443 are open"
 ```
 
 Note categories are `recon`, `staging`, `exploitation`, `postex`, and `files`.
-Notes are timestamped, stored under `notes/`, and included in the report.
+Notes are timestamped, saved in `notes/<category>.md`, and included in the
+report.
 
-### Verify and export
+### Verify, export, and finalize
 
-```bash
-dorocap verify
-dorocap export
-```
+`dorocap verify` checks that every evidence file has a sidecar and that its
+hash and category still match. It also reports sidecars without a file,
+symlinks, and finding links to missing or invalid evidence. It does not check
+findings, notes, or `scope.yaml`.
 
-`verify` checks sidecars, hashes, orphaned files, sidecar categories, and
-finding links. It does not hash findings, notes, or `scope.yaml`. `export`
-writes the complete draft to `report/draft/report.md`, including scope,
-findings, linked evidence, notes, and integrity warnings. When verification
-succeeds it also writes `report/draft/report.md.sha256`. When verification
-fails it still writes the draft, deletes a stale checksum, and exits non-zero.
-PNG, JPEG, GIF, and WebP evidence is embedded directly as a Markdown image;
-other evidence remains a clickable link. Generated Markdown uses paths relative
-to the draft or final report, such as `../../evidence/exploitation/screenshot.png`.
-Two parent segments are required because reports live under `report/draft/` or
-`report/final/`.
+`dorocap export` writes `report/draft/report.md`. The report has a cover and
+revision history, an executive summary with severity totals, a risk summary,
+the scope, methodology, and limitations, each finding with its evidence, a
+remediation roadmap, the notes, and the verification results. PNG, JPEG, GIF,
+and WebP evidence is embedded; other files are linked. The links are relative
+(`../../evidence/...`), so keep the report inside the engagement folder or
+send `evidence/` with it.
 
-The generated draft also includes cover metadata, document revision history,
-an executive summary, severity distribution, linked risk summary, engagement
-scope and restrictions, methodology, limitations, structured findings,
-captioned evidence, remediation roadmap, notes, and integrity results.
+When verification passes, `export` also writes `report/draft/report.md.sha256`.
+When it fails, `export` still writes the draft so you can read the warnings,
+deletes any old checksum, and exits with an error.
 
-After reviewing the draft, promote it to the final directory:
+`dorocap finalize` verifies the evidence again and copies the draft to
+`report/final/report.md`, but only if the draft still matches its checksum.
+It never regenerates the draft. If you edited the draft by hand, run
+`dorocap finalize --accept-edits`: it saves a new checksum for your edited
+draft, then copies it.
 
-```bash
-dorocap finalize
-```
-
-Finalization verifies the current evidence vault and copies
-`report/draft/report.md` to `report/final/report.md` only when the draft still
-matches `report.md.sha256`. It never regenerates the draft. If you edited the
-draft by hand, record that edit and then promote it:
-
-```bash
-dorocap finalize --accept-edits
-```
-
-## Typical workflow
-
-```bash
-dorocap init acme-2026
-dorocap ss file ~/Downloads/nmap.txt "Initial port scan"
-dorocap finding add "Unnecessary service exposed" --severity med
-dorocap finding link 0001 <Tab>
-dorocap note recon "Service confirmed from the external network"
-dorocap verify
-dorocap export
-dorocap finalize
-# After editing report/draft/report.md, record that edit and promote it:
-# dorocap finalize --accept-edits
-```
-
-## Shell autocomplete
-
-Load completion for the current shell session:
-
-```bash
-# Zsh
-source <(dorocap completion zsh)
-
-# Bash
-source <(dorocap completion bash)
-
-# Fish
-dorocap completion fish | source
-
-# PowerShell
-dorocap completion powershell | Out-String | Invoke-Expression
-```
-
-To enable Zsh completion on every new terminal, add this line to `~/.zshrc`:
-
-```zsh
-source <(dorocap completion zsh)
-```
-
-For permanent Fish completion:
-
-```fish
-mkdir -p ~/.config/fish/completions
-dorocap completion fish > ~/.config/fish/completions/dorocap.fish
-exec fish
-```
-
-For permanent PowerShell completion, add this line to `$PROFILE`:
-
-```powershell
-dorocap completion powershell | Out-String | Invoke-Expression
-```
-
-Completion for Zsh, Bash, Fish, and PowerShell covers every command, finding
-subcommand, evidence category, severity value, engagement directory, finding
-ID, and verified evidence path. For example, after loading it, press Tab after
-either argument:
-
-```bash
-dorocap finding link <Tab> <Tab>
-```
-
-The first completion lists finding IDs. After selecting an ID, the second lists
-verified evidence that is not already linked to that finding. Fish suppresses
-unrelated filesystem suggestions; files are offered only for `ss file`, and
-directories only for `path`.
-
-## Terminal compatibility
-
-Dorocap selects output capabilities conservatively:
-
-- Redirected output, `TERM=dumb`, `NO_COLOR`, and legacy Windows CMD receive no
-  ANSI escapes.
-- Terminals advertising `COLORTERM=truecolor`, `COLORTERM=24bit`, a direct-color
-  `TERM`, or Windows Terminal receive the full Neust 24-bit palette.
-- Other ANSI-capable terminals receive a readable 16-color approximation.
-- Non-interactive, explicitly ASCII, and legacy Windows output uses ASCII tree
-  and banner characters. Set `DOROCAP_ASCII=1` to force this mode.
-- Nerd Font icons are opt-in. Set `DOROCAP_NERD=1` to enable them; plain `*` and
-  `+` symbols are used by default. `DOROCAP_NO_NERD=1` always disables icons.
-
-For maximum compatibility:
-
-```bash
-NO_COLOR=1 DOROCAP_ASCII=1 dorocap help
-```
-
-Every `init` scaffolds a `scope.yaml` marker and saves that engagement as the
-global default, so `ss`/`note`/`finding`/`export` work from any directory.
-The supported capture/note categories are `recon`, `staging`, `exploitation`,
-and `postex`; imported files are stored under `files`.
-
-Evidence is committed as a file plus a `.json` sidecar. Sidecars record the
-capture time, host, category, note, source basename (for imports), and SHA-256.
-Run `dorocap verify` before export or delivery. These checksums detect accidental
-or unauthorized changes when compared with a trusted copy, but are not by
-themselves a signed chain-of-custody system.
+The hashes show whether evidence changed after capture. They are not a signed
+chain of custody.
 
 ## scope.yaml
 
-`dorocap init <name>` generates this template at the engagement root:
-
-```yaml
-# scope.yaml - engagement scope and rules of engagement
-engagement: acme-2026
-client: ""
-assessment_type: "Penetration Test"
-testing_mode: ""
-classification: "Confidential"
-report_version: "0.1"
-prepared_by: "@0xF3tt"
-start_date: ""
-end_date: ""
-executive_summary: ""
-overall_posture: ""
-in_scope:
-  - ""
-out_of_scope:
-  - ""
-contacts:
-  - ""
-restrictions:
-  - ""
-emergency_stop_conditions:
-  - ""
-limitations:
-  - ""
-methodology:
-  - Reconnaissance
-  - Enumeration
-  - Vulnerability analysis
-  - Exploitation
-  - Post-exploitation
-  - Evidence verification
-  - Reporting
-revision_history:
-  - version: "0.1"
-    date: ""
-    author: "@0xF3tt"
-    changes: "Initial draft"
-```
-
-Fill it in by hand, e.g.:
+`init` creates `scope.yaml` with most fields empty. Fill it in by hand: `export`
+uses it for the report's cover, summary, scope, contacts, restrictions,
+methodology, limitations, and revision history. A filled-in example:
 
 ```yaml
 # scope.yaml - engagement scope and rules of engagement
@@ -450,38 +287,68 @@ revision_history:
     changes: "Final report"
 ```
 
-It currently doubles as dorocap's own engagement-root marker (how `ss`/`note`/
-`finding`/`export` find the right folder from a subdirectory) — the
-`in_scope`/`out_of_scope` fields are documentation only, not yet enforced
-against captured evidence.
+- Keep the file: it marks the engagement's root folder, which is how commands
+  find the engagement from a subfolder.
+- `in_scope` and `out_of_scope` only appear in the report. dorocap does not
+  check evidence against them.
+
+## Shell completion
+
+Set it up once for your shell, then open a new terminal:
+
+```bash
+# Zsh: add to ~/.zshrc, after compinit
+source <(dorocap completion zsh)
+
+# Bash: add to ~/.bashrc
+eval "$(dorocap completion bash)"
+
+# Fish: run once
+mkdir -p ~/.config/fish/completions
+dorocap completion fish > ~/.config/fish/completions/dorocap.fish
+
+# PowerShell: add to $PROFILE
+dorocap completion powershell | Out-String | Invoke-Expression
+```
+
+Tab then completes commands, categories, severities, finding IDs, and
+evidence paths. After `dorocap finding link 0001`, it offers only verified
+evidence that is not yet linked to that finding.
+
+## Terminal output
+
+- Colors turn off when output is redirected, when `TERM=dumb`, or when
+  `NO_COLOR` is set.
+- `DOROCAP_ASCII=1` draws trees and the banner with plain ASCII characters.
+- `DOROCAP_NERD=1` adds Nerd Font icons, which are off by default.
 
 ## Development
 
+```bash
+make test     # unit tests
+make lint     # gofmt check, go vet, golangci-lint (with staticcheck and gosec)
+make audit    # gitleaks over the git history, then govulncheck
+make release  # all checks, then macOS and Linux binaries, checksums, and an SBOM
 ```
-make test    # unit tests
-make lint    # gofmt + vet + golangci-lint (includes staticcheck and gosec)
-make audit   # gitleaks + govulncheck, at the versions pinned in the Makefile
-make release # macOS/Linux binaries, checksums, and CycloneDX SBOM
-```
 
-`make lint` needs `golangci-lint` v2.15.0 on your `PATH` (brew or mise).
-`make audit` and `make release` fetch their scanners with `go run`, so they
-need no separate install. See `make help` for the full target list. Before
-opening a PR, make sure `make lint` and `make audit` are both clean and
-`make test` passes.
+`make lint` needs `golangci-lint` v2.15.0 on your `PATH` (install it with
+brew or mise). The scanners in `make audit` and `make release` run through
+`go run`, so they need no install. `make help` lists every target.
 
-## Automation
+If you use [pre-commit](https://pre-commit.com), `pre-commit install` runs the
+formatting, secret, lint, and test checks from `.pre-commit-config.yaml`
+before each commit.
 
-CI, CodeQL, Dependabot, release gates, permissions, and repository setup are
-described in [`docs/AUTOMATION.md`](docs/AUTOMATION.md).
+A pull request needs `make test`, `make lint`, and `make audit` to pass, and
+CI runs the same checks. [docs/AUTOMATION.md](docs/AUTOMATION.md) explains CI,
+CodeQL, Dependabot, and how releases are published.
 
 ## Security
 
-dorocap is a local CLI that writes to disk with your own user permissions and
-does not expose a network listener. Treat engagement folders and imported
-evidence as sensitive data. See
-[SECURITY.md](SECURITY.md) for how to report a vulnerability.
+dorocap runs locally with your user's permissions and opens no network port.
+Treat engagement folders as sensitive client data. To report a vulnerability,
+see [SECURITY.md](SECURITY.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
