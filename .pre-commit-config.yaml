@@ -9,18 +9,20 @@ repos:
       - id: check-merge-conflict
       - id: detect-private-key
 
+  # Keep this rev's version equal to GITLEAKS_VERSION in the Makefile.
   - repo: https://github.com/gitleaks/gitleaks
     rev: 83d9cd684c87d95d656c1458ef04895a7f1cbd8e # v8.30.1
     hooks:
       - id: gitleaks
 
   # Local hooks reuse the project's own Makefile targets so pre-commit and CI
-  # never drift apart. gosec/govulncheck (make audit) are CI-only: govulncheck
-  # hits a network vulnerability DB, which has no place gating a local commit.
+  # never drift apart. make audit (gitleaks history scan + govulncheck) is
+  # CI-only: govulncheck hits a network vulnerability DB, which has no place
+  # gating a local commit.
   - repo: local
     hooks:
       - id: go-lint
-        name: go lint (fmt + vet + staticcheck + golangci-lint)
+        name: go lint (fmt + vet + golangci-lint with staticcheck and gosec)
         entry: make lint
         language: system
         types: [go]

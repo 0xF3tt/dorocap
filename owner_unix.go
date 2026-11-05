@@ -9,7 +9,7 @@ import (
 )
 
 func statPathUID(path string) (int, error) {
-	info, err := os.Stat(path)
+	info, err := os.Stat(path) //nolint:gosec // G703: the operator's own local path; this call is the ownership check
 	if err != nil {
 		return 0, err
 	}

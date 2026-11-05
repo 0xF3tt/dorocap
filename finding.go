@@ -95,7 +95,7 @@ func findingAdd(dir string, args []string) error {
 					return fmt.Errorf("--%s requires a value", option)
 				}
 				i++
-				value = args[i]
+				value = args[i] //nolint:gosec // G602: i+1 < len(args) is checked above
 			}
 			key := strings.ReplaceAll(option, "-", "_")
 			switch key {
@@ -333,8 +333,8 @@ func validateFindingMetadata(key, value string) error {
 }
 
 func findingSet(dir string, args []string) error {
-	if len(args) == 2 && (args[1] == "--interactive" || args[1] == "-i") {
-		return findingSetInteractive(dir, args[0])
+	if len(args) == 2 && (args[1] == "--interactive" || args[1] == "-i") { //nolint:gosec // G602: len(args) == 2 is checked first
+		return findingSetInteractive(dir, args[0]) //nolint:gosec // G602: same len(args) == 2 guard
 	}
 	if len(args) < 3 {
 		return fmt.Errorf("usage: dorocap finding set <id> --interactive\n   or: dorocap finding set <id> <severity|status|asset|cvss|cwe|owasp|retest-status|retested> <value>")

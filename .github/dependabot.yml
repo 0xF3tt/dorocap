@@ -1,63 +1,42 @@
 version: 2
+
+# Monthly, with one grouped pull request per ecosystem (majors included) and
+# one grouped pull request for security fixes. main requires up-to-date
+# branches, so every extra pull request means another rebase after each merge.
+# Scanner versions pinned in the Makefile are bumped by hand (see Makefile).
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "monthly"
       time: "09:00"
       timezone: "America/Monterrey"
     # Skip versions younger than a week: most hijacked releases are caught by then.
     # Security updates ignore cooldown.
     cooldown:
       default-days: 7
-    open-pull-requests-limit: 3
     commit-message:
       prefix: "deps(actions)"
     groups:
-      actions-non-major:
+      actions:
         patterns: ["*"]
-        update-types: ["minor", "patch"]
+      actions-security:
+        applies-to: security-updates
+        patterns: ["*"]
 
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "monthly"
       time: "09:20"
       timezone: "America/Monterrey"
-    # Skip versions younger than a week: most hijacked releases are caught by then.
-    # Security updates ignore cooldown.
     cooldown:
       default-days: 7
-    open-pull-requests-limit: 5
     commit-message:
       prefix: "deps(go)"
     groups:
-      go-non-major:
+      go:
         patterns: ["*"]
-        update-types: ["minor", "patch"]
-
-  - package-ecosystem: "gomod"
-    directory: "/tools"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:40"
-      timezone: "America/Monterrey"
-    # Skip versions younger than a week: most hijacked releases are caught by then.
-    # Security updates ignore cooldown.
-    cooldown:
-      default-days: 7
-    open-pull-requests-limit: 3
-    commit-message:
-      prefix: "deps(tools)"
-    groups:
-      tools-non-major:
-        patterns: ["*"]
-        update-types: ["minor", "patch"]
-      # One PR for all tool security fixes: main requires up-to-date branches,
-      # so every separate PR would need its own rebase after each merge.
-      tools-security:
+      go-security:
         applies-to: security-updates
         patterns: ["*"]
